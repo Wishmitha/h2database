@@ -398,8 +398,8 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         return get(getRootPage(), key);
     }
 
-    public final V get(Object key, String st) {
-        return get(getRootPage(), key, st);
+    public final V getInterpolate(Object key) {
+        return getInterpolate(getRootPage(), key);
     }
 
     /**
@@ -415,8 +415,8 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         return (V) Page.get(p, key);
     }
 
-    public V get(Page p, Object key, String st) {
-        return (V) Page.get(p, key, st);
+    public V getInterpolate(Page p, Object key) {
+        return (V) Page.getInterpolate(p, key);
     }
 
     @Override

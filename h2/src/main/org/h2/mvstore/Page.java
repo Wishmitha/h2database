@@ -207,7 +207,7 @@ public abstract class Page implements Cloneable
         }
     }
 
-    static Object get(Page p, Object key, String st) {
+    static Object getInterpolate(Page p, Object key) {
         while (true) {
             int index = p.interpolationSearch(key);
             if (p.isLeaf()) {
