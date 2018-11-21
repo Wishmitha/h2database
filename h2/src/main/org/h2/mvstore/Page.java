@@ -197,7 +197,7 @@ public abstract class Page implements Cloneable
      */
     static Object get(Page p, Object key) {
         while (true) {
-            int index = p.binarySearch(key);
+            int index = p.interpolationSearch(key);
             if (p.isLeaf()) {
                 return index >= 0 ? p.getValue(index) : null;
             } else if (index++ < 0) {
@@ -521,6 +521,47 @@ public abstract class Page implements Cloneable
         cachedCompare = low;
         return -(low + 1);
     }
+
+    public int interpolationSearch(Object key) {
+        // Find indexes of two corners
+
+        if (key.getClass() == Integer.class) {
+
+            int low = 0, high = keys.length - 1;
+
+            int x = cachedCompare - 1;
+            if (x < 0 || x > high) {
+                x = high >>> 1;
+            }
+
+            // Since array is sorted, an element present
+            // in array must be in range defined by corner
+            while (low <= high) // && x >= keys[lo] && x <= arr[hi]
+            {
+                // Probing the position with keeping
+                // uniform distribution in mind.
+                int pos = low + (((high - low) / ((int) keys[high] - (int) keys[low])) * ((int) key - (int) keys[low]));
+
+                // Condition of target found
+                if ((int) keys[pos] == (int) key)
+                    return pos;
+
+                // If x is larger, x is in upper part
+                if ((int) keys[pos] < (int) key)
+                    low = pos + 1;
+
+                    // If x is smaller, x is in the lower part
+                else
+                    high = pos - 1;
+            }
+            return -(low + 1);
+
+        } else {
+            return binarySearch(key);
+        }
+    }
+
+
 
     /**
      * Split the page. This modifies the current page.
