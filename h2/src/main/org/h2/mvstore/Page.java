@@ -197,6 +197,18 @@ public abstract class Page implements Cloneable
      */
     static Object get(Page p, Object key) {
         while (true) {
+            int index = p.binarySearch(key);
+            if (p.isLeaf()) {
+                return index >= 0 ? p.getValue(index) : null;
+            } else if (index++ < 0) {
+                index = -index;
+            }
+            p = p.getChildPage(index);
+        }
+    }
+
+    static Object get(Page p, Object key, String st) {
+        while (true) {
             int index = p.interpolationSearch(key);
             if (p.isLeaf()) {
                 return index >= 0 ? p.getValue(index) : null;
