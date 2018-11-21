@@ -398,6 +398,10 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         return get(getRootPage(), key);
     }
 
+    public final V get(Object key, String st) {
+        return get(getRootPage(), key, st);
+    }
+
     /**
      * Get the value for the given key from a snapshot, or null if not found.
      *
@@ -409,6 +413,10 @@ public class MVMap<K, V> extends AbstractMap<K, V>
     @SuppressWarnings("unchecked")
     public V get(Page p, Object key) {
         return (V) Page.get(p, key);
+    }
+
+    public V get(Page p, Object key, String st) {
+        return (V) Page.get(p, key, st);
     }
 
     @Override
