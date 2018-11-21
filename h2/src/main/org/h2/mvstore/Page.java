@@ -539,34 +539,25 @@ public abstract class Page implements Cloneable
 
         if (key.getClass() == Integer.class) {
 
-            int low = 0, high = keys.length - 1;
+            int low = 0;
+            int high = keys.length - 1;
+            int mid;
 
-            int x = cachedCompare - 1;
-            if (x < 0 || x > high) {
-                x = high >>> 1;
-            }
+            while (((int)keys[high] != (int)keys[low]) && ((int)key >= (int)keys[low]) && ((int)key <= (int)keys[high])) {
+                mid = low + (((int)key - (int)keys[low]) * (high - low) / ((int)keys[high] - (int)keys[low]));
 
-            // Since array is sorted, an element present
-            // in array must be in range defined by corner
-            while (low <= high) // && x >= keys[lo] && x <= arr[hi]
-            {
-                // Probing the position with keeping
-                // uniform distribution in mind.
-                int pos = low + (((high - low) / ((int) keys[high] - (int) keys[low])) * ((int) key - (int) keys[low]));
-
-                // Condition of target found
-                if ((int) keys[pos] == (int) key)
-                    return pos;
-
-                // If x is larger, x is in upper part
-                if ((int) keys[pos] < (int) key)
-                    low = pos + 1;
-
-                    // If x is smaller, x is in the lower part
+                if ((int)keys[mid] < (int)key)
+                    low = mid + 1;
+                else if ((int)key < (int)keys[mid])
+                    high = mid - 1;
                 else
-                    high = pos - 1;
+                    return mid;
             }
-            return -(low + 1);
+
+            if ((int)key == (int)keys[low])
+                return low ;
+            else
+                return -1;
 
         } else {
             return binarySearch(key);
