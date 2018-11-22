@@ -480,6 +480,9 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         return operate((K)key, null, DecisionMaker.REMOVE);
     }
 
+    public V removeInterpolate(Object key) {
+        return operateInterpolate((K)key, null, DecisionMaker.REMOVE);
+    }
     /**
      * Add a key-value pair if it does not yet exist.
      *
