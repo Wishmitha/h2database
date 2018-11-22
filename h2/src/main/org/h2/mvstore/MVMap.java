@@ -411,6 +411,10 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         return getInterpolate(getRootPage(), key);
     }
 
+    public final V getInterpolateWithCaceh(Object key) {
+        return getInterpolateWithCache(getRootPage(), key);
+    }
+
     /**
      * Get the value for the given key from a snapshot, or null if not found.
      *
@@ -426,6 +430,10 @@ public class MVMap<K, V> extends AbstractMap<K, V>
 
     public V getInterpolate(Page p, Object key) {
         return (V) Page.getInterpolate(p, key);
+    }
+
+    public V getInterpolateWithCache(Page p, Object key) {
+        return (V) Page.getInterpolateWithCache(p, key);
     }
 
     @Override
