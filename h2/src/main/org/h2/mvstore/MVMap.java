@@ -149,6 +149,11 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         return put(key, value, DecisionMaker.PUT);
     }
 
+    public V putInterpolate(K key, V value) {
+        DataUtils.checkArgument(value != null, "The value may not be null");
+        return putInterpolate(key, value, DecisionMaker.PUT);
+    }
+
     /**
      * Add or replace a key-value pair.
      *
@@ -158,6 +163,10 @@ public class MVMap<K, V> extends AbstractMap<K, V>
      */
     public final V put(K key, V value, DecisionMaker<? super V> decisionMaker) {
         return operate(key, value, decisionMaker);
+    }
+
+    public final V putInterpolate(K key, V value, DecisionMaker<? super V> decisionMaker) {
+        return operateInterpolate(key, value, decisionMaker);
     }
 
     /**
@@ -1841,6 +1850,147 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         }
     }
 
+    public V operateInterpolate(K key, V value, DecisionMaker<? super V> decisionMaker) {
+        beforeWrite();
+        int attempt = 0;
+        RootReference oldRootReference = null;
+        while(true) {
+            RootReference rootReference = getRoot();
+            int contention = 0;
+            if (oldRootReference != null) {
+                long updateAttemptCounter = rootReference.updateAttemptCounter -
+                        oldRootReference.updateAttemptCounter;
+                assert updateAttemptCounter >= 0 : updateAttemptCounter;
+                long updateCounter = rootReference.updateCounter - oldRootReference.updateCounter;
+                assert updateCounter >= 0 : updateCounter;
+                assert updateAttemptCounter >= updateCounter : updateAttemptCounter + " >= " + updateCounter;
+                contention = (int)((updateAttemptCounter+1) / (updateCounter+1));
+            }
+            oldRootReference = rootReference;
+            ++attempt;
+            CursorPos pos = traverseDownInterpolate(rootReference.root, key);
+            Page p = pos.page;
+            int index = pos.index;
+            CursorPos tip = pos;
+            pos = pos.parent;
+            @SuppressWarnings("unchecked")
+            V result = index < 0 ? null : (V)p.getValue(index);
+            Decision decision = decisionMaker.decide(result, value);
+
+            int unsavedMemory = 0;
+            boolean needUnlock = false;
+            try {
+                switch (decision) {
+                    case REPEAT:
+                        decisionMaker.reset();
+                        continue;
+                    case ABORT:
+                        if(rootReference != getRoot()) {
+                            decisionMaker.reset();
+                            continue;
+                        }
+                        return result;
+                    case REMOVE: {
+                        if (index < 0) {
+                            if(rootReference != getRoot()) {
+                                decisionMaker.reset();
+                                continue;
+                            }
+                            return null;
+                        }
+                        if (attempt > 2 && !(needUnlock = lockRoot(decisionMaker, rootReference,
+                                attempt, contention))) {
+                            continue;
+                        }
+                        if (p.getTotalCount() == 1 && pos != null) {
+                            p = pos.page;
+                            index = pos.index;
+                            pos = pos.parent;
+                            if (p.getKeyCount() == 1) {
+                                assert index <= 1;
+                                p = p.getChildPage(1 - index);
+                                break;
+                            }
+                            assert p.getKeyCount() > 1;
+                        }
+                        p = p.copy();
+                        p.remove(index);
+                        break;
+                    }
+                    case PUT: {
+                        if (attempt > 2 && !(needUnlock = lockRoot(decisionMaker, rootReference,
+                                attempt, contention))) {
+                            continue;
+                        }
+                        value = decisionMaker.selectValue(result, value);
+                        p = p.copy();
+                        if (index < 0) {
+                            p.insertLeaf(-index - 1, key, value);
+                            int keyCount;
+                            while ((keyCount = p.getKeyCount()) > store.getKeysPerPage()
+                                    || p.getMemory() > store.getMaxPageSize()
+                                    && keyCount > (p.isLeaf() ? 1 : 2)) {
+                                long totalCount = p.getTotalCount();
+                                int at = keyCount >> 1;
+                                Object k = p.getKey(at);
+                                Page split = p.split(at);
+                                unsavedMemory += p.getMemory();
+                                unsavedMemory += split.getMemory();
+                                if (pos == null) {
+                                    Object keys[] = { k };
+                                    Page.PageReference children[] = {
+                                            new Page.PageReference(p),
+                                            new Page.PageReference(split)
+                                    };
+                                    p = Page.create(this, keys, null, children, totalCount, 0);
+                                    break;
+                                }
+                                Page c = p;
+                                p = pos.page;
+                                index = pos.index;
+                                pos = pos.parent;
+                                p = p.copy();
+                                p.setChild(index, split);
+                                p.insertNode(index, k, c);
+                            }
+                        } else {
+                            p.setValue(index, value);
+                        }
+                        break;
+                    }
+                }
+                unsavedMemory += p.getMemory();
+                while (pos != null) {
+                    Page c = p;
+                    p = pos.page;
+                    p = p.copy();
+                    p.setChild(pos.index, c);
+                    unsavedMemory += p.getMemory();
+                    pos = pos.parent;
+                }
+                if(needUnlock) {
+                    unlockRoot(p, attempt);
+                    needUnlock = false;
+                } else if(!updateRoot(rootReference, p, attempt)) {
+                    decisionMaker.reset();
+                    continue;
+                }
+                while (tip != null) {
+                    tip.page.removePage();
+                    tip = tip.parent;
+                }
+                if (store.getFileStore() != null) {
+                    store.registerUnsavedPage(unsavedMemory);
+                }
+                return result;
+            } finally {
+                if(needUnlock) {
+                    unlockRoot(rootReference.root, attempt);
+                }
+            }
+        }
+    }
+
     private boolean lockRoot(DecisionMaker<? super V> decisionMaker, RootReference rootReference,
                                 int attempt, int contention) {
         boolean success = lockRoot(rootReference);
@@ -1880,6 +2030,20 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         while (!p.isLeaf()) {
             assert p.getKeyCount() > 0;
             int index = p.binarySearch(key) + 1;
+            if (index < 0) {
+                index = -index;
+            }
+            pos = new CursorPos(p, index, pos);
+            p = p.getChildPage(index);
+        }
+        return new CursorPos(p, p.binarySearch(key), pos);
+    }
+
+    private static CursorPos traverseDownInterpolate(Page p, Object key) {
+        CursorPos pos = null;
+        while (!p.isLeaf()) {
+            assert p.getKeyCount() > 0;
+            int index = p.interpolationSearch(key) + 1;
             if (index < 0) {
                 index = -index;
             }
