@@ -411,7 +411,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         return getInterpolate(getRootPage(), key);
     }
 
-    public final V getInterpolateWithCaceh(Object key) {
+    public final V getInterpolateWithCache(Object key) {
         return getInterpolateWithCache(getRootPage(), key);
     }
 

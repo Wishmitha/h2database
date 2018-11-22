@@ -557,14 +557,16 @@ public abstract class Page implements Cloneable {
             int mid;
 
             while (((int) keys[high] != (int) keys[low]) && ((int) key >= (int) keys[low]) && ((int) key <= (int) keys[high])) {
-                mid = low + (((int) key - (int) keys[low]) * (high - low) / ((int) keys[high] - (int) keys[low]));
+                mid =  low + (((int) key - (int) keys[low]) * (high - low) / ((int) keys[high] - (int) keys[low]));
 
                 if ((int) keys[mid] < (int) key)
                     low = mid + 1;
                 else if ((int) key < (int) keys[mid])
                     high = mid - 1;
-                else
+                else{
                     return mid;
+                }
+
             }
 
             if((int)keys[keys.length - 1] == (int)key) {
@@ -587,38 +589,40 @@ public abstract class Page implements Cloneable {
 
             int low = 0;
             int high = keys.length - 1;
-            int mid;
-
-            mid = cachedCompare - 1;
+//            int mid;
+            int mid = cachedCompare - 1;
             if (mid < 0 || mid > high) {
-                mid = low + (((int) key - (int) keys[low]) * (high - low) / ((int) keys[high] - (int) keys[low]));
+                if(((int) keys[high] - (int) keys[low]) != 0)
+                    mid = low + (((int) key - (int) keys[low]) * (high - low) / ((int) keys[high] - (int) keys[low]));
+
             }
 
-            while (((int) keys[high] != (int) keys[low]) &&
-                    ((int) key >= (int) keys[low]) && ((int) key <= (int) keys[high])) {
+            while (((int) keys[high] != (int) keys[low]) && ((int) key >= (int) keys[low]) && ((int) key <= (int) keys[high])) {
 
-                if ((int) keys[mid] < (int) key) {
+                if ((int) keys[mid] < (int) key)
                     low = mid + 1;
-                } else if ((int) key < (int) keys[mid]) {
+                else if ((int) key < (int) keys[mid])
                     high = mid - 1;
-                } else {
-                    cachedCompare = mid - 1;
+                else{
+                    cachedCompare = mid + 1;
                     return mid;
                 }
 
-                if(high != low) {
-                    mid = low + (((int) key - (int) keys[low]) * (high - low) / ((int) keys[high] - (int) keys[low]));
-                } else {
-                    mid = low + (((int) key - (int) keys[low]) * (high - low));
-                }
+
+                if(((int) keys[high] - (int) keys[low]) != 0)
+                    mid =  low + (((int) key - (int) keys[low]) * (high - low) / ((int) keys[high] - (int) keys[low]));
+
             }
 
-            cachedCompare = low;
-
-            if ((int) key == (int) keys[low]) {
-                return low;
+            if((int)keys[keys.length - 1] == (int)key) {
+                cachedCompare = high - 1;
+                return -high;
+            } else if ((int)keys[keys.length - 1] < (int)key) {
+                cachedCompare = high + 1;
+                return -(high + 2);
             } else {
-                return -1;
+                cachedCompare = low;
+                return -(low + 1);
             }
 
         } else {
